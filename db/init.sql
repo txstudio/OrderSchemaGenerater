@@ -22,16 +22,16 @@ CREATE DATABASE [OrderSchemaGenerater]
 GO
 
 /*
-	¦¹³]©w»P Azure SQL Database ¬Û¦P
+	æ­¤è¨­å®šèˆ‡ Azure SQL Database ç›¸åŒ
 	https://blogs.msdn.microsoft.com/sqlcat/2013/12/26/be-aware-of-the-difference-in-isolation-levels-if-porting-an-application-from-windows-azure-sql-db-to-sql-server-in-windows-azure-virtual-machine/
 */
 
---±Ò¥Î SNAPSHOT_ISOLATION
+--å•Ÿç”¨ SNAPSHOT_ISOLATION
 ALTER DATABASE [OrderSchemaGenerater]
 	SET ALLOW_SNAPSHOT_ISOLATION ON
 GO
 
---±Ò¥Î READ_COMMITTED_SNAPSHOT
+--å•Ÿç”¨ READ_COMMITTED_SNAPSHOT
 ALTER DATABASE [OrderSchemaGenerater]
 	SET READ_COMMITTED_SNAPSHOT ON
 	WITH ROLLBACK IMMEDIATE
@@ -47,7 +47,7 @@ CREATE SCHEMA [Events]
 GO
 
 
---Àx¦s¹w¦sµ{§Ç¿ù»~ªº¨Æ¥ó¬ö¿ı¸ê®Æªí
+--å„²å­˜é å­˜ç¨‹åºéŒ¯èª¤çš„äº‹ä»¶ç´€éŒ„è³‡æ–™è¡¨
 CREATE TABLE [Events].[EventDatabaseErrorLog] (
 	[No]                INT IDENTITY(1, 1),
 	[ErrorTime]         DATETIME DEFAULT (SYSDATETIMEOFFSET()),
@@ -80,8 +80,8 @@ AS
         END
 
         --
-        --¦pªG¦³¶i¦æ¤¤ªº¥æ©ö¥¿¦b¨Ï¥Î®É¤£¶i¦æ°O¿ı
-        -- (©|¥¼ rollback ©Î commit)
+        --å¦‚æœæœ‰é€²è¡Œä¸­çš„äº¤æ˜“æ­£åœ¨ä½¿ç”¨æ™‚ä¸é€²è¡Œè¨˜éŒ„
+        -- (å°šæœª rollback æˆ– commit)
         --
         IF XACT_STATE() = (- 1)
         BEGIN
@@ -117,7 +117,7 @@ AS
     END CATCH
 GO
 
---²£¥Í CHAR(15) ­q³æ½s¸¹ªº¯Â¶q¨ç¼Æ
+--ç”¢ç”Ÿ CHAR(15) è¨‚å–®ç·¨è™Ÿçš„ç´”é‡å‡½æ•¸
 --	YYYYMMDD0000000
 CREATE FUNCTION [Orders].[OrderSchemaGenerater] 
 (
@@ -143,7 +143,7 @@ BEGIN
 END
 GO
 
-/* Àx¦s­q³æ½s¸¹ªº¸ê®Æªí */
+/* å„²å­˜è¨‚å–®ç·¨è™Ÿçš„è³‡æ–™è¡¨ */
 CREATE TABLE [Orders].[OrderSchemaBuffer]
 (
 	[PresentDate]	DATE NOT NULL,
@@ -157,13 +157,13 @@ CREATE TABLE [Orders].[OrderSchemaBuffer]
 )
 GO
 
---­q³æ¸ê®Æªí¥D¯Á¤ŞÁä¨Ï¥Î§Ç¦C
+--è¨‚å–®è³‡æ–™è¡¨ä¸»ç´¢å¼•éµä½¿ç”¨åºåˆ—
 CREATE SEQUENCE [Orders].[OrderMainSeq]
 	START WITH 1
 	INCREMENT BY 1
 GO
 
-/* ­q³æ½s¸¹¥D¸ê®Æªí */
+/* è¨‚å–®ç·¨è™Ÿä¸»è³‡æ–™è¡¨ */
 CREATE TABLE [Orders].[OrderMains]
 (
 	[No]			INT NOT NULL,
@@ -176,81 +176,92 @@ CREATE TABLE [Orders].[OrderMains]
 )
 GO
 
-/* ªì©l¤Æ­q³æ½s¸¹Àx¦s¸ê®Æªíªº¸ê®Æ¦C¤º®e */
+/* åˆå§‹åŒ–è¨‚å–®ç·¨è™Ÿå„²å­˜è³‡æ–™è¡¨çš„è³‡æ–™åˆ—å…§å®¹ */
 INSERT INTO [Orders].[OrderSchemaBuffer] ([PresentDate],[Index]) VALUES (DATEADD(DAY,-2,GETDATE()),999)
 INSERT INTO [Orders].[OrderSchemaBuffer] ([PresentDate],[Index]) VALUES (DATEADD(DAY,-1,GETDATE()),999)
 INSERT INTO [Orders].[OrderSchemaBuffer] ([PresentDate],[Index]) VALUES (GETDATE(),1)
 INSERT INTO [Orders].[OrderSchemaBuffer] ([PresentDate],[Index]) VALUES (DATEADD(DAY,1,GETDATE()),1)
 GO
 
-/* ¨ú±o·s¤@µ§­q³æ­n¨Ï¥Îªº­q³æ½s¸¹ */
+/* å–å¾—æ–°ä¸€ç­†è¨‚å–®è¦ä½¿ç”¨çš„è¨‚å–®ç·¨è™Ÿ */
 CREATE PROCEDURE [Orders].[GetNewOrderSchema]
 	@CurrentDate	DATE,
 	@OutSchema		CHAR(15) OUT,
 	@Success		BIT OUT
 AS
-DECLARE @NextDate		DATE
-DECLARE @output			TABLE
-(
-	[PresentDate]		DATE,
-	[Index]				SMALLINT,
+	DECLARE @IsTransaction	BIT
+	DECLARE @NextDate		DATE
+	DECLARE @output			TABLE
+	(
+		[PresentDate]		DATE,
+		[Index]				SMALLINT,
 
-	PRIMARY KEY ([PresentDate])
-)
-
-SET @NextDate = DATEADD(DAY,1,@CurrentDate)
-
-BEGIN TRY
-	BEGIN TRANSACTION
-
-	UPDATE [Orders].[OrderSchemaBuffer]
-		SET [Index] = [Index] + 1
-	OUTPUT DELETED.[PresentDate]
-		,DELETED.[Index]
-	INTO @output
-	WHERE [PresentDate] = @CurrentDate
-
-	--¨ú±o­n·s¼W¨ì­q³æªº­q³æ½s¸¹
-	SET @OutSchema = (
-		SELECT [Orders].[OrderSchemaGenerater]([PresentDate],[Index]) [OutSchema]
-		FROM @output
+		PRIMARY KEY ([PresentDate])
 	)
 
-	--²M°£¹O®Éªº­q³æ½w½Ä¸ê®Æ
-	DELETE FROM [Orders].[OrderSchemaBuffer]
-	WHERE [PresentDate] < DATEADD(DAY,-1,@CurrentDate)
+	SET @NextDate = DATEADD(DAY,1,@CurrentDate)
 
+	BEGIN TRY
+		IF XACT_STATE() = 0
+		BEGIN
+			BEGIN TRANSACTION
+			SET @IsTransaction = 1
+		END
 
-	--¹w¥ı«Ø¥ß¤U¤@­Ó¤é´Áªº­q³æ½w½Ä¸ê®Æ
-	IF NOT EXISTS (
-		SELECT * FROM [Orders].[OrderSchemaBuffer]
-		WHERE [PresentDate] = @NextDate
-	)
-	BEGIN
-		INSERT INTO [Orders].[OrderSchemaBuffer] (
-			[PresentDate]
-			,[Index]
-		) VALUES (
-			@NextDate
-			,1
+		UPDATE [Orders].[OrderSchemaBuffer]
+			SET [Index] = [Index] + 1
+		OUTPUT DELETED.[PresentDate]
+			,DELETED.[Index]
+		INTO @output
+		WHERE [PresentDate] = @CurrentDate
+
+		--å–å¾—è¦æ–°å¢åˆ°è¨‚å–®çš„è¨‚å–®ç·¨è™Ÿ
+		SET @OutSchema = (
+			SELECT [Orders].[OrderSchemaGenerater]([PresentDate],[Index]) [OutSchema]
+			FROM @output
 		)
-	END
 
-	COMMIT TRANSACTION
+		--æ¸…é™¤é€¾æ™‚çš„è¨‚å–®ç·©è¡è³‡æ–™
+		DELETE FROM [Orders].[OrderSchemaBuffer]
+		WHERE [PresentDate] < DATEADD(DAY,-1,@CurrentDate)
 
-	SET @Success = 1
-END TRY
 
-BEGIN CATCH
-	ROLLBACK TRANSACTION
+		--é å…ˆå»ºç«‹ä¸‹ä¸€å€‹æ—¥æœŸçš„è¨‚å–®ç·©è¡è³‡æ–™
+		IF NOT EXISTS (
+			SELECT * FROM [Orders].[OrderSchemaBuffer]
+			WHERE [PresentDate] = @NextDate
+		)
+		BEGIN
+			INSERT INTO [Orders].[OrderSchemaBuffer] (
+				[PresentDate]
+				,[Index]
+			) VALUES (
+				@NextDate
+				,1
+			)
+		END
+		
+		IF @IsTransaction = 1
+		BEGIN
+			COMMIT TRANSACTION
+		END
 
-	EXEC [Events].[AddEventDatabaseError]
+		SET @Success = 1
+	END TRY
 
-	SET @Success = 0
-END CATCH
+	BEGIN CATCH
+		IF @IsTransaction = 1
+		BEGIN
+			ROLLBACK TRANSACTION
+		END
+
+		EXEC [Events].[AddEventDatabaseError]
+
+		SET @Success = 0
+	END CATCH
 GO
 
---«Ø¥ß­q³æ¸ê®Æªº¹w¦sµ{§Ç/³¡¤À
+--å»ºç«‹è¨‚å–®è³‡æ–™çš„é å­˜ç¨‹åº/éƒ¨åˆ†
 CREATE PROCEDURE [Orders].[AddOrder]
 	@CurrentDate	DATE,
 	@Success		BIT OUT
@@ -264,7 +275,7 @@ BEGIN TRY
 	IF @CurrentDate IS NULL
 		SET @CurrentDate = GETDATE()
 
-	--¨ú±o¦¹µ§­q³æªº­q³æ½s¸¹
+	--å–å¾—æ­¤ç­†è¨‚å–®çš„è¨‚å–®ç·¨è™Ÿ
 	EXEC [Orders].[GetNewOrderSchema] 
 		@CurrentDate
 		, @OutSchema OUT
